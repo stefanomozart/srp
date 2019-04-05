@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /*
-Package `srp` provides an implementation of SRP-6a, as defined in RFC 5054. There
+Package srp provides an implementation of SRP-6a, as defined in RFC 5054. There
 are three main types: Params, Client and Server.
 
 Apart from those types, the package uses variable names that mach those defined in
@@ -50,20 +50,21 @@ protocol descrition:
 											b := random()
 											k := H(N | PAD(g))
 											B := (k*v + g^b) % N
-								<--------	Server Hello (N, g, k, s, B)
+								<--------	Server Hello (N, g, s, B)
 	(abort if B % N = 0)
 	a := random()
 	A := g^a % N
 	Client Key Exchange (A)		-------->
 											u := H(PAD(A) | PAD(B))
-											S := (A*v^u)^b % N
+											S := (A * v^u)^b % N
 	x := H(s | H(I | ":" | P))
 	u := H(PAD(A) | PAD(B))
+	k := H(N | PAD(g))
 	S := (B - (k*g^x))^(a + (u*x)) % N
 
 
-Differences between this implementation and RFC 5054:
-* We allow differente choices of Hash function, while the RFC defines SHA-1
-* W
+Extensions of this implementation, when compared to the plain RFC 5054 definition:
+* We allow different choices of Hash function, while the RFC defines SRP with SHA-1 only
+* We allow the use of any group parameters (the prime modulus N and the group generator g)
 */
 package srp
