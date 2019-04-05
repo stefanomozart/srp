@@ -1,22 +1,31 @@
 package srp
 
-type Client {
-	N big
+import (
+	"math/big"
+)
+
+type Client struct {
+	N *big.Int
 	I []byte
 	p []byte
 }
 
-func NewClient(gp *GroupParams) Client {
+func NewClient(param *Params) Client {
 	return &Client{
 		N: gp.N
 		g: gp.g
 	}
 }
 
-func (*Client) verifier() []byte {
+func (c *Client) Hello(I string) []byte {
+	c.I = []byte(I)
+	return c.I
+}
+
+func (c *Client) Key() []byte {
 
 }
 
-func (* Client) start() ([]byte, []byte) {
+func (c *Client) start() ([]byte, []byte) {
 
 }
