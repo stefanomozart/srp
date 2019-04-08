@@ -14,6 +14,7 @@ type Params struct {
 	H crypto.Hash
 }
 
+// GroupParams defines the a group modulus and generator
 type GroupParams struct {
 	N string
 	g int
@@ -169,34 +170,47 @@ const RFC5054Groups = map[int]GroupParams{
 const defaultBitSizeParam = 3072
 
 // NewDefaultParams returns the default choice of parameters
-func NewDefaultParams() Params {
-	return &Params{
-		N: RFC5054Groups[defaultBitSizeParam].N,
+func NewDefaultParams() *Params {
+	p := &Params{
+		N: new(big.Int),
 		g: RFC5054Groups[defaultBitSizeParam].g,
-		H: crypto.SHA256.New(),
+		H: crypto.SHA256,
 	}
+	p.N.UnmarshalText(RFC5054Groups[defaultBitSizeParam].N)
+	return p
 }
 
-// NewParams returns the Param structure to be used on Server or Client
-// instances
-func NewParams(bitSize Int, hashFunc *crypto.Hash) (Params, error) {
-	genGroup, ok := RFC5054Groups[bitSize]
+// NewParams returns the Param structure to be used on Server or Client instances.
+// The bitSize param must match one of the bit sizes in RFC 5054 Apendix A
+func NewParams(bitSize int, hashFunc crypto.Hash) (*Params, error) {
+	gp, ok := RFC5054Groups[bitSize]
 	if !ok {
 		return nil, fmt.Errorf("Incorrect bit size parameter (must be one of the bit-sizes defined in RFC 5054 Apendix A) ")
 	}
 	return &Params{
-		N: genGroup.N,
-		g: genGroup.g,
+		N: gp.N,
+		g: gp.g,
 		H: hashFunc,
 	}, nil
 }
 
+// NewParamsWithCustomGroup returns a Params object with the given custom params
+func NewParamsWithCustomGroup(gp *GroupParams, hashFunc crypto.Hash) *Params {
+	p := &Params{
+		N: new(big.Int),
+		g: gp.g,
+		H: hashFunc,
+	}
+	p.N.UnmarshalText(gp.N)
+	return p
+}
+
 // N returns the modulus of the the group
-func (g *Params) N() *big.Int {
+func (g *Params) modulus() *big.Int {
 	return g.N
 }
 
 // Generator returns teh group generator g
-func (g *Group) Generator() *big.Int {
+func (g *Params) Generator() int {
 	return g.g
 }
