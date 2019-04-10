@@ -9,7 +9,7 @@ three main types:
 * `srp.Client`: to create client side messages and values, such as user's salt **s** and verifier
   **v** (during user registration), and client private secret **a** and public key exchange value
   **A** (during user authentication);
-* `srp.Server`: to create server side messages and values, such as server's private secret **b** 
+* `srp.Server`: to create server side messages and values, such as server's private secret **b**
   and public key exchange value **B**.
   
   Both, `srp.Client` and `srp.Server` will derive a shared secret **S** (called *premaster secret* in
@@ -22,22 +22,22 @@ three main types:
 Apart from those types, the package uses variable names that mach those defined in
 [SRP-6a](https://tools.ietf.org/html/rfc5054#section-2.3):
 
-| Name  | Type      | Description |
-| ----- | --------- | ------------------------------------------------------------------------------------ |
-| **N** | `big.Int` | safe prime (in the form 2p-1, withp prime), used as group modulus |
-| **g** | `int64`   | a circular group generator in (2, N-1) |
-| **s** | `[]bytes` | salt, a "random" sequence of bytes, generated during user registration |
-| **b**, **B** | `[]bytes` | server's private and public key exchange values |
-| **a**, **A** | `[]bytes` | client's private and public key exchange values |
-| **I** | `[]bytes` | user identity |
-| **P** | `[]bytes` | user password |
-| **H** | `crypto.Hash` | a hash digest (one-way) function |
-| **x** | `[]bytes` | a salted digest of the user's credentials (in the form `x := H(s | H(I | ":" | P))`) |
-| **v** | `[]bytes` | user verifier (in the form `v := g^x % N`) |
-| **PAD** | `func`  | Byte padding function |
-| **k** | `[]bytes` | SRP-6a multiplier (`k := H(N | PAD(g))`) |
-| **S** | `[]bytes` | premaster secret |
-| **K** | `[]bytes` | shared session key |
+| Name         | Type          | Description                                                                          |
+| ------------ | ------------- | ------------------------------------------------------------------------------------ |
+| **N**        | `big.Int`     | safe prime (in the form 2p-1, with p prime), used as group modulus                   |
+| **g**        | `int64`       | a circular group generator in (2, N-1)                                               |
+| **s**        | `[]bytes`     | salt, a "random" sequence of bytes, generated during user registration               |
+| **b**, **B** | `[]bytes`     | server's private and public key exchange values                                      |
+| **a**, **A** | `[]bytes`     | client's private and public key exchange values                                      |
+| **I**        | `[]bytes`     | user identity                                                                        |
+| **P**        | `[]bytes`     | user password                                                                        |
+| **H**        | `crypto.Hash` | a hash digest (one-way) function                                                     |
+| **x**        | `[]bytes`     | a salted digest of the user's credentials (in the form `x := H(s | H(I | ":" | P))`) |
+| **v**        | `[]bytes`     | user verifier (in the form `v := g^x % N`)                                           |
+| **PAD**      | `func`        | Byte padding function                                                                |
+| **k**        | `[]bytes`     | SRP-6a multiplier (`k := H(N | PAD(g))`)                                             |
+| **S**        | `[]bytes`     | premaster secret                                                                     |
+| **K**        | `[]bytes`     | shared session key                                                                   |
 
 This package also implements the evidence message extension defined in
 [RFC 2945](https://tools.ietf.org/html/rfc2945). The variable names associated with this extension
@@ -50,7 +50,7 @@ are:
 
 ## The SRP Protocol
 
-Package functions are organized to match protocol description in 
+Package functions are organized to match protocol description in
 [RFC 5054](https://tools.ietf.org/html/rfc5054). So each protocol message will have a corresponding
 method. Bellow a brief protocol descrition:
 
@@ -92,19 +92,17 @@ method. Bellow a brief protocol descrition:
 
 ### Evidence messages (as defined in RFC 2945)
 
-                        Client                       Server
-                --------------                       ----------------
+                        Client                      Server
+                --------------                      ----------------
       M1 = H(H(N) XOR H(g) | H(U) | s | A | B | K)
-    Client Evidence (M1)                   -------->
-                                                        (abort if M1 != H(H(N) XOR H(g) | H(U) | s | A | B | K))
-                                                        M2 := H(A | M1 | K)
-                                           <--------  Server Evidence (M2)
+    Client Evidence (M1)                 -------->
+                                                      (abort if M1 != H(H(N) XOR H(g) | H(U) | s | A | B | K))
+                                                      M2 := H(A | M1 | K)
+                                         <--------  Server Evidence (M2)
       (abort if M2 != H(A | M1 | K))
 
 More details on the SRP protocol, it's definition and security proof, as well as the original article
 where it was presented can be found on [The Stanford SRP Homepage](http://srp.stanford.edu).
-
- 
 
 ## Implementation details
 
@@ -125,7 +123,7 @@ simplified execution path is:
   import "github.com/stefanomozart/srp"
   
   // 1. Generate a random salt and compute the user's public verifier
-  // ("I" and "P" are the original string form of user Identity and Password)
+  // ("I" and "P" are the original strings for user Identity and Password)
   client := srp.NewClient("I", "P")
   s, v, err := client.Registration()
 
@@ -146,19 +144,21 @@ we need to follow these steps:
 ```go
 import "github.com/stefanomozart/srp"
 
-// 1. Send user indentification (I []bytes) to the server
+// 1. Send user indentification (I []bytes) to
+// the server
 
-// 5. Receive protocol parameters from the server
-// (N, g, h)
+// 5. Receive protocol parameters from the
+//  server (N, g, h)
 
-// 6. Create client instance with the parameters received
-// from the server ("I" and "P" are the original string
-// form of user Identity and Password)
+// 6. Create client instance with the parameters
+// received from the server ("I" and "P" are the
+// original strings for user Identity and
+// Password)
 params, err := srp.NewCustomParams(N, g, h);
 client := srp.NewClientWithParams(params, "I", "P")
   
-// 7. Generate a hashing salt a compute the user's public
-// verifier
+// 7. Generate a hashing salt a compute the user's
+// public verifier
 s, v, err := client.Registration()
 
 // 8. Then, send (s, v) to the server
@@ -174,10 +174,11 @@ import "github.com/stefanomozart/srp"
 
 // 2. Receive user identity I
 
-// 3. Load the chosen protocol execution parameters
-// In this example, we use the 4096 bit-size group
-// params from RFC 5054 Appendix A
-params := srp.NewParams(4096, crypto.SHA3_256)
+// 3. Load the chosen protocol execution
+// parameters. In this example, we use the
+// 4096 bit-size group params from RFC 5054
+// Appendix A
+params := srp.NewParams(4096, crypto.SHA512)
 N := params.Modulus()
 g := params.Generator()
 h := params.HashFunction()
@@ -328,7 +329,7 @@ The standard execution path would be:
 
   // 11. receive Client Key Exchange (A) message from client and use the
   // received value to compute the sessio key
-  K := server.SessionKey()
+  K := server.SessionKey(A)
   
   // 15. Additionally, you may want to receive and check evidence message M1
   err := server.VerifyEvidence(M1)
@@ -338,8 +339,6 @@ The standard execution path would be:
 
   // 17. Send Server Evidence Message (M2)
 ```
-
- 
 
 ### RFC 5054 Appendix A - Group Parameters
 
@@ -354,11 +353,10 @@ the default hashing function. In order to use diferent group or hash parameters,
   // Example: using the RFC 4096 bit-size group params to generate a user verifier
   params := srp.NewParams(4096, crypto.SHA256)
   client := srp.NewClientWithParams(params, "userId", "userPwd")
-  s, v, err := client.Registration()
 
   // Likewise, you can have a server with the RFC 5054 6144 bit-size group params
   // just make sure to use the same parameters both on client and server sides
-  params := srp.NewParams(5054, crypto.SHA256)
+  params := srp.NewParams(6144, crypto.SHA256)
   server := srp.NewServerWithParams(params, s, v)
 ```
 
@@ -371,17 +369,16 @@ with caution, as a non-safe prime may weaken your implementation.
   // Example: using custom group parameters
   params, err := srp.NewCustomParams(hexEncodedStringValOfN, int64ValOfG, crypto.SHA3_256)
   client := srp.ClientWithParams(params, "userId", "userPwd")
-  s, v, err := client.Registration()
 ```
 
 ### Custom hash function
 
-You can choose any hash function that implements the crypto.Hash interface. We strongly advice for
-the use of standard library implementations, specially those with longer digest sizes, such as
-`crypto.SHA512`, `crypto.SHA3_256`, `crypto.SHA3_384`, `crypto.SHA3_512`, `crypto.BLAKE2b_384`
-and `crypto.BLAKE2b_512`. The `crypto.SHA3_256` hash function is used as default in this package. In
-order to set a different hash function, use a `srp.Params` structure to create your srp client or
-server:
+You can choose any hash function that implements the `crypto.Hash` interface. We strongly advice
+for the use of standard library implementations, specially those with longer digest sizes, such
+as `crypto.SHA512`, `crypto.SHA3_256`, `crypto.SHA3_384`, `crypto.SHA3_512`, `crypto.BLAKE2b_384`
+and `crypto.BLAKE2b_512`. This package uses the `crypto.SHA3_256` hash function as default. In
+order to set a different hash function, use a `srp.Params` structure to create your srp client
+or server:
 
 ```go
   import "github.com/stefanomozart/srp"
