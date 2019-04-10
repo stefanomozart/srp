@@ -1,49 +1,61 @@
 package srp
 
 import (
-	"crypto"
 	"math/big"
 )
 
 // Client performs the computations required on the user side of the protocol
 type Client struct {
-	N *big.Int
-	g int
-	h crypto.Hash
-	I []byte
-	P []byte
+	params *Params
+	I      []byte
+	P      []byte
+	a      []byte
+	A      []byte
 }
 
-// NewClient returns a new client
-func NewClient(param *Params) *Client {
+// NewClient returns a new client, with the given credentials
+func NewClient(I []byte, P []byte) *Client {
+	p := NewDefaultParams()
 	return &Client{
-		N: param.N,
-		g: param.g,
-		h: param.H,
+		params: p,
+		I:      I,
+		P:      P,
 	}
 }
 
+// NewClientWithParams returns a new client, with the given credentials,
+// using the custom group and hash parameters
+func NewClientWithParams(p *Params, I []byte, P []byte) *Client {
+	return &Client{
+		params: p,
+		I:      I,
+		P:      P,
+	}
+}
+
+// SetCredentials changes Client's credentials
 func (c *Client) SetCredentials(I string, P string) []byte {
 	c.I = []byte(I)
 	c.P = []byte(P)
 	return c.I
 }
 
+// GenerateA computes and returns the Client's chalange A (in the form A := g^a % N,
+// for a := random()), used during the Key Exchange part of the protocol
 func (c *Client) GenerateA() []byte {
 	c.a = getRandomBytes(3)
-	c.A = big.NewInt(c.g).pow(big.NewInt(0).SetBytes(c.a)).mod(c.N)
+	a := big.NewInt(0).SetBytes(c.a)
+	g := big.NewInt(c.params.g)
+	A := new(big.Int)
+	c.A = A.Exp(g, a, c.params.N).Bytes()
 	return c.A
 }
 
-//B, ok1 := big.NewInt(0).SetString(v[1], 16)
-func (c *Client) GenerateKey() ([]byte, []byte) {
+// SessionKey computes and returns the SRP Session key, defined as
+// S := (B - (k*g^x))^(a + (u*x)) % N
+func (c *Client) SessionKey() ([]byte, []byte) {
 	return nil, nil
 }
 
-func (c *Client) H(a []byte) []byte {
-	h := c.h.New()
-	for _, z := range a {
-		h.Write(z)
-	}
-	return h.Sum(nil)
-}
+//var n int64 = 97
+//s := strconv.FormatInt(n, 16) // s == "61" (hexadecimal)
