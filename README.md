@@ -3,16 +3,18 @@
 [![GoDoc](https://godoc.org/github.com/stefanomozart/srp?status.svg)](https://godoc.org/github.com/stefanomozart/srp)
 [![Go Report Card](https://goreportcard.com/badge/github.com/stefanomozart/srp)](https://goreportcard.com/report/github.com/stefanomozart/srp)
 
-This package provides an implementation of SRP-6a, as defined in RFC 5054. This implementation uses
+This package provides an implementation of SRP-6a, as defined in RFC 5054. The implementation uses
 three main types:
 
-* `srp.Client`: to create client side messages, user's verifier **v** and salt **s** (during user 
-  registration), and client private secret **a** and public challenge **A** (during user
-  authentication);
-* `srp.Server`: to create server side messages: server's private secret **b** and authentication
-  challenge **B**, shared session key. Both, `srp.Client` and `srp.Server` will derive a shared key
-  **S** (called *premaster secret* in the RFC), a session key **K**, used to encrypt messages between
-  both parties during that authenticated session, and the evidence message **M1**;
+* `srp.Client`: to create client side messages and values, such as user's salt **s** and verifier
+  **v** (during user registration), and client private secret **a** and public key exchange value
+  **A** (during user authentication);
+* `srp.Server`: to create server side messages and values, such as server's private secret **b** 
+  and public key exchange value **B**.
+  
+  Both, `srp.Client` and `srp.Server` will derive a shared secret **S** (called *premaster secret* in
+  the RFC), a session key **K**, used to encrypt messages between both parties during that
+  authenticated session. Also, both can compute evidence messages **M1** and **M2**;
 * `srp.Params`: a structure to facilitate the definition of the three macro parameters for SRP
   protocol execution: the prime modulus **N** and a circular group generator **g** and a hash
   digest function.
@@ -21,15 +23,15 @@ Apart from those types, the package uses variable names that mach those defined 
 [SRP-6a](https://tools.ietf.org/html/rfc5054#section-2.3):
 
 | Name  | Type      | Description |
-| ----- | --------- | ----------- |
+| ----- | --------- | ------------------------------------------------------------------------------------ |
 | **N** | `big.Int` | safe prime (in the form 2p-1, withp prime), used as group modulus |
 | **g** | `int64`   | a circular group generator in (2, N-1) |
 | **s** | `[]bytes` | salt, a "random" sequence of bytes, generated during user registration |
-| **B**, **b** | `[]bytes` | server's public and private values |
-| **A**, **a** `[]bytes` | client's public and private values |
+| **b**, **B** | `[]bytes` | server's private and public key exchange values |
+| **a**, **A** | `[]bytes` | client's private and public key exchange values |
 | **I** | `[]bytes` | user identity |
 | **P** | `[]bytes` | user password |
-| **H** | `crypto.H |sh`: a hash digest (one-way) function |
+| **H** | `crypto.Hash` | a hash digest (one-way) function |
 | **x** | `[]bytes` | a salted digest of the user's credentials (in the form `x := H(s | H(I | ":" | P))`) |
 | **v** | `[]bytes` | user verifier (in the form `v := g^x % N`) |
 | **PAD** | `func`  | Byte padding function |
@@ -37,8 +39,9 @@ Apart from those types, the package uses variable names that mach those defined 
 | **S** | `[]bytes` | premaster secret |
 | **K** | `[]bytes` | shared session key |
 
-We also implement the evidence message extension defined in [RFC 2945](https://tools.ietf.org/html/rfc2945).
-The variable names associated with this extension are:
+This package also implements the evidence message extension defined in
+[RFC 2945](https://tools.ietf.org/html/rfc2945). The variable names associated with this extension
+are:
 
 | Name  | Type      | Description |
 | ----- | --------- | ----------- |
@@ -86,28 +89,35 @@ method. Bellow a brief protocol descrition:
       k := H(N | PAD(g))
       S := (B - (k*g^x))^(a + (u*x)) % N
       K := H(S)
-      M1 = H(H(N) XOR H(g) | H(U) | s | A | B | K)
 
 ### Evidence messages (as defined in RFC 2945)
 
-    Client Evidence (M1)     -------->
-                                            (abort if M1 != H(H(N) XOR H(g) | H(U) | s | A | B | K))
-                                            M2 := H(A | M1 | K)
-                              <--------   Server Evidence (M2)
+                        Client                       Server
+                --------------                       ----------------
+      M1 = H(H(N) XOR H(g) | H(U) | s | A | B | K)
+    Client Evidence (M1)                   -------->
+                                                        (abort if M1 != H(H(N) XOR H(g) | H(U) | s | A | B | K))
+                                                        M2 := H(A | M1 | K)
+                                           <--------  Server Evidence (M2)
       (abort if M2 != H(A | M1 | K))
+
+More details on the SRP protocol, it's definition and security proof, as well as the original article
+where it was presented can be found on [The Stanford SRP Homepage](http://srp.stanford.edu).
+
+ 
 
 ## Implementation details
 
 This implementation extends the default RF 5054 speficication, allowing the following customizations:
 
-* We allow different choices of Hash function, while the RFC speficication fixes the use of SHA-1;
-* We allow the use of any group parameters (the prime modulus N and the group generator g);
-* We provide simplified user registration and authentication protocol paths, eliminating messages 
-  used only to exchange of protocol parameters.
+* It allows different choices of hash function, while the RFC speficication fixes the use of SHA-1;
+* It allows the use of any group parameters (the prime modulus N and the group generator g);
+* It provides simplified user registration and authentication protocol paths, eliminating messages
+  used only for the exchange of protocol parameters.
 
 ### Registration protocol (simplified path)
 
-Our implementation provides a simplified execution trail for the protocol. Assuming that both client
+This implementation provides a simplified execution path for the protocol. Assuming that both client
 and server will use default parameters, we don't need the **Server Hello(N, g)** message. The
 simplified execution path is:
 
@@ -115,7 +125,8 @@ simplified execution path is:
   import "github.com/stefanomozart/srp"
   
   // 1. Generate a random salt and compute the user's public verifier
-  client := srp.NewClient("userId", "userPassword")
+  // ("I" and "P" are the original string form of user Identity and Password)
+  client := srp.NewClient("I", "P")
   s, v, err := client.Registration()
 
   // 2. Then, send (I, s, v) to the server
@@ -123,52 +134,57 @@ simplified execution path is:
 
 ### Registration protocol (standard)
 
-In order to o run the user registration protocol with the **Server Hello** message, we need to
-follow these steps:
+In order to o run the user registration protocol with the standard **Server Hello(N, g)** message,
+we need to follow these steps:
 
 <table>
 <tr>
 <td>
 
-**On the Client:**
+**Client:**
 
 ```go
-  import "github.com/stefanomozart/srp"
+import "github.com/stefanomozart/srp"
 
-  // 1. Send user indentification (I []bytes) to the server
+// 1. Send user indentification (I []bytes) to the server
 
-  // 5. Receive protocol parameters from the server (N, g, hashFunction)
+// 5. Receive protocol parameters from the server
+// (N, g, h)
 
-  // 6. Creat client instance with the parameters received from the server
-  params := srp.NewParamsWhithCustomGroup(N, g, hashFunction);
-  client := srp.NewClientWithParams(params, "userId", "userPassword")
+// 6. Create client instance with the parameters received
+// from the server ("I" and "P" are the original string
+// form of user Identity and Password)
+params, err := srp.NewCustomParams(N, g, h);
+client := srp.NewClientWithParams(params, "I", "P")
   
-  // 7. Generate a hashing salt a compute the user's public verifier
-  s, v, err := client.Registration()
+// 7. Generate a hashing salt a compute the user's public
+// verifier
+s, v, err := client.Registration()
 
-  // 8. Then, send (s, v) to the server
+// 8. Then, send (s, v) to the server
 ```
 
 </td>
 <td>
 
-**On the Server:**
+**Server:**
 
 ```go
-  import "github.com/stefanomozart/srp"
+import "github.com/stefanomozart/srp"
 
-  // 2. Receive user identity I
+// 2. Receive user identity I
 
-  // 3. Load the chosen protocol execution parameters
-  // In this example, we use the 4096 bit-size group
-  // params from RFC 5054 Appendix A
-  params := srp.NewParams(4096, crypto.SHA3_256)
-  N := params.Modulus()
-  g := params.Generator()
-  
-  // 4. Then, send (N, g, crypto.SHA3_256) to the client
+// 3. Load the chosen protocol execution parameters
+// In this example, we use the 4096 bit-size group
+// params from RFC 5054 Appendix A
+params := srp.NewParams(4096, crypto.SHA3_256)
+N := params.Modulus()
+g := params.Generator()
+h := params.HashFunction()
 
-  // 9. Receive (s, v). Store (I, s, v)
+// 4. Then, send (N, g, h) to the client
+
+// 9. Receive (s, v). Store (I, s, v)
 ```
 
 </td>
@@ -186,47 +202,60 @@ eliminate the need to send protocol execution parameters to the client.
 <td>
 
 ```go
-  import "github.com/stefanomozart/srp"
+import "github.com/stefanomozart/srp"
 
-  // 1. Create a srp.Client with the default parameters
-  // (assumes the client and server will use default parameters)
-  client := srp.NewClient("userId", "userPassword")
-  I, A := client.Hello()
+// 1. Create a srp.Client with the default
+// parameters
+client := srp.NewClient("I", "P")
 
-  // 2. Client sends (I, A) to the server over the network.
+// 2. Generate client secret `a` and key
+// exchange value `A`
+I, A := client.Hello()
 
-  // 7. Client receives B and uses this value to compute
-  // a session key
-  sessioKey := client.SessionKey(B)
+// 3. Client sends (I, A) to the server over
+// the network.
 
-  // 8. Additionally, the client can generate an evidence
-  // message
-  M1 := client.EvidenceMessage()
+// 8. Client receives Server Hello (B, s)
+// message and uses these values to compute
+// a session key
+K := client.SessionKey(B, s)
 
-  // 9. Then, send (M1) to the server
+// 9. Additionally, the client can generate
+// an evidence message
+M1 := client.EvidenceMessage()
+
+// 10. Then, send (M1) to the server
 ```
 
 </td>
 <td>
 
 ```go
-  import "github.com/stefanomozart/srp"
+import "github.com/stefanomozart/srp"
 
-  // 3. The server should look up the user database for the the
-  // salt s and verifier v corresponding to the indentity I
-  s, v := db.VerifierLookup(I)
+// 4. The server receives Client Hello (I, A)
+// and searches the user database for the
+// salt and verifier (s, v) corresponding to
+// the indentity I
+s, v := db.search(I)
 
-  // 4. Create a srp.Server using the default parameters
-  server := srp.NewServer(v, s)
+// 5. Create a srp.Server using the default
+// parameters
+server := srp.NewServer(v, s)
 
-  // 5. Generate server's secret value b and public challenge B  
-  B := server.GenerateB()
+// 6. Generate server's secret value b and
+// public key exchange value B  
+B, s := server.Hello()
 
-  // 6. Send (B) to the client over the network.
+// 7. Send Server Hello (B, s) to the
+// client over the network.
 
-  // 10. Additionally, you may want to receive and check
-  // an evidence message M1
-  err := server.VerifyEvidence(M1)
+// 8. Compute the session key
+K := server.SessionKey(A)
+
+// 10. Additionally, you may want to
+// receive and check evidence message M1
+err := server.VerifyEvidence(M1)
 ```
 
 </td>
@@ -240,22 +269,77 @@ server that accepts connections from clients built by third parties. In this cas
 complete *Server.Hello* message, as defined in RF 5054, that includes protocol operation parameters:
 N, g and hash function.
 
-Therefore, we include helper functions in the `srp.Params` type, so you can access those informations:
+Therefore, we include helper functions in the `srp.Params` type, so you can access those informations.
+The standard execution path would be:
+
+#### Client
 
 ```go
   import "github.com/stefanomozart/srp"
   
-  // Example: new server using the crypto.BLAKE2b_384 hash function
+  // 1. Client Hello: send (I []byte - byte form of user identity) to the server
 
-  // 1. Load the desired parameters
+  // 7. Receive Server Standard Hello (N, g, h, s, B) from the server
+
+  // 8. Create client instance with the parameters received from the server
+  // ("I" and "P" are the original string form of user Identity and Password)
+  params, err := srp.NewCustomParams(N, g, h);
+  client := srp.NewClientWithParams(params, "I", "P")
+  
+  // 9. Generate client secret `a` and key exchange value `A`
+  A := client.KeyExchange()
+
+  // 10. Send Client Key Exchange (A) message to the server
+
+  // 12. Use (B, s) received before to compute a session key
+  K := client.SessionKey(B, s)
+
+  // 13. Additionally, the client can generate an evidence message
+  M1 := client.EvidenceMessage()
+
+  // 14. Then, send (M1) to the server
+
+  // 18. And receive the Server Evidence Message (M2), in order to
+  // authenticate the server
+  err := client.VerifyEvidence(M2)
+```
+
+#### Server
+
+```go
+  import "github.com/stefanomozart/srp"
+  
+  // 2. Receive Client Standard Hello (I) and search the user database for
+  // the salt and verifier (s, v) corresponding to the indentity I
+  s, v := db.search(I)
+
+  // 3. Load the desired parameters. In this example we want to create a
+  // new server using the 4096 bit-size group crypto.BLAKE2b_384 hash function
   params := srp.NewParams(4096, crypto.BLAKE2b_384)
   
-  // 2. Retrive the parameters details
-  N := params.Modulus() // returns the bytes of the N parameter
-  g := params.Generator() // returns the g parameter
+  // 4. Create the server using the designated parameters
+  server := srp.NewServerWithParams(params, s, v)
 
-  // 3. Send the server hello (N, g, crypto.BLAKE2b_384, s, B)
+  // 5. Generate server secret b, compute server public key exchange value B
+  // and retrieve the standard Server Hello message
+  N, g, h, B := server.StandardHello()
+
+  // 6. Send the standard Server Hello (N, g, h, s, B) message to the client
+
+  // 11. receive Client Key Exchange (A) message from client and use the
+  // received value to compute the sessio key
+  K := server.SessionKey()
+  
+  // 15. Additionally, you may want to receive and check evidence message M1
+  err := server.VerifyEvidence(M1)
+
+  // 16. And generate server evidence, so the client may also authenticate the server
+  M2 := server.EvidenceMessage()
+
+  // 17. Send Server Evidence Message (M2)
 ```
+
+ 
 
 ### RFC 5054 Appendix A - Group Parameters
 
@@ -291,7 +375,7 @@ with caution, as a non-safe prime may weaken your implementation.
 ```
 
 ### Custom hash function
-1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+
 You can choose any hash function that implements the crypto.Hash interface. We strongly advice for
 the use of standard library implementations, specially those with longer digest sizes, such as
 `crypto.SHA512`, `crypto.SHA3_256`, `crypto.SHA3_384`, `crypto.SHA3_512`, `crypto.BLAKE2b_384`
