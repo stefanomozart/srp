@@ -10,19 +10,20 @@ import (
 // during protocol execution
 type Params struct {
 	N *big.Int
-	g int
-	H crypto.Hash
+	g int64
+	h crypto.Hash
 }
 
-// GroupParams defines the a group modulus and generator
-type GroupParams struct {
+// groupParams is a structure used to inform the modulus and generator of the
+// modular circular group to be used in the protocol
+type groupParams struct {
 	N string
-	g int
+	g int64
 }
 
-// RFC5054Groups is a map of pre Group Params defined in RFC 5054 Apendix A, using the group's
-// modulus bit-size is the key
-const RFC5054Groups = map[int]GroupParams{
+// RFC5054Groups is a map of Group Parameters (N, g) defined in RFC 5054 Apendix A,
+// using the group's modulus bit-size is the key
+var RFC5054Groups = map[int]groupParams{
 	1024: {
 		N: "EEAF0AB9 ADB38DD6 9C33F80A FA8FC5E8 60726187 75FF3C0B 9EA2314C " +
 			"9C256576 D674DF74 96EA81D3 383B4813 D692C6E0 E0D5D8E2 50B98BE4 " +
@@ -174,9 +175,14 @@ func NewDefaultParams() *Params {
 	p := &Params{
 		N: new(big.Int),
 		g: RFC5054Groups[defaultBitSizeParam].g,
-		H: crypto.SHA256,
+		h: crypto.SHA256,
 	}
-	p.N.UnmarshalText(RFC5054Groups[defaultBitSizeParam].N)
+	ok := false
+	p.N, ok = p.N.SetString(RFC5054Groups[defaultBitSizeParam].N, 16)
+	if !ok {
+		panic("Error while loading group modulus")
+	}
+
 	return p
 }
 
@@ -185,32 +191,53 @@ func NewDefaultParams() *Params {
 func NewParams(bitSize int, hashFunc crypto.Hash) (*Params, error) {
 	gp, ok := RFC5054Groups[bitSize]
 	if !ok {
-		return nil, fmt.Errorf("Incorrect bit size parameter (must be one of the bit-sizes defined in RFC 5054 Apendix A) ")
+		return nil, fmt.Errorf("Incorrect bit size parameter (must be one of the bit sizes defined in RFC 5054 Apendix A) ")
 	}
-	return &Params{
-		N: gp.N,
-		g: gp.g,
-		H: hashFunc,
-	}, nil
-}
-
-// NewParamsWithCustomGroup returns a Params object with the given custom params
-func NewParamsWithCustomGroup(gp *GroupParams, hashFunc crypto.Hash) *Params {
 	p := &Params{
 		N: new(big.Int),
 		g: gp.g,
-		H: hashFunc,
+		h: hashFunc,
 	}
-	p.N.UnmarshalText(gp.N)
-	return p
+	p.N, ok = p.N.SetString(gp.N, 16)
+	if !ok {
+		panic("Error while loading group modulus")
+	}
+
+	return p, nil
 }
 
-// N returns the modulus of the the group
-func (g *Params) modulus() *big.Int {
-	return g.N
+// NewParamsWithCustomGroup returns a Params object with the given custom params
+func NewParamsWithCustomGroup(N string, g int64, hashFunc crypto.Hash) (*Params, error) {
+	p := &Params{
+		N: new(big.Int),
+		g: g,
+		h: hashFunc,
+	}
+	ok := false
+	p.N, ok = p.N.SetString(N, 16)
+	if !ok {
+		return nil, fmt.Errorf("Error while loading group modulus")
+	}
+	if !p.N.ProbablyPrime(10) {
+		return nil, fmt.Errorf("Modulus is probably not prime (see math/big documentation)")
+	}
+	return p, nil
 }
 
-// Generator returns teh group generator g
-func (g *Params) Generator() int {
+// Modulus returns the modulus N of the the group
+func (g *Params) Modulus() []byte {
+	return g.N.Bytes()
+}
+
+// Generator returns the group's generator g
+func (g *Params) Generator() int64 {
 	return g.g
+}
+
+// H computes the hashsum digest of the given byte string, using the hashing
+// function defined for the current Params instance
+func (g *Params) H(a []byte) []byte {
+	h := g.h.New()
+	h.Write(a)
+	return h.Sum(nil)
 }
